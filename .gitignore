@@ -2,8 +2,15 @@
 *.sublime-workspace
 node_modules
 public/js/*.min.js
+public/js/*-bundle.js
 public/css/*.css
 public/lib/enketo-core
 public/lib/bower-components
+locales/en/translation_old.json
+config/config.json
 .rebooted
 .vagrant
+.scratchpad
+.nodemon-*
+.DS_Store
+enketo-main.rdb

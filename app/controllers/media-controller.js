@@ -1,9 +1,11 @@
-"use strict";
+'use strict';
 
-var request = require( 'request' ),
-    express = require( 'express' ),
-    router = express.Router(),
-    debug = require( 'debug' )( 'media-controller' );
+var user = require( '../models/user-model' );
+var communicator = require( '../lib/communicator' );
+var request = require( 'request' );
+var express = require( 'express' );
+var router = express.Router();
+var debug = require( 'debug' )( 'media-controller' );
 
 module.exports = function( app ) {
     app.use( '/media', router );
@@ -20,23 +22,21 @@ function _extractMediaUrl( path ) {
 }
 
 function getMedia( req, res, next ) {
-    var mediaUrl = _extractMediaUrl( req.params[ 0 ] );
-    // url decode this (done in php app)?
+    var options = communicator.getUpdatedRequestOptions( {
+        url: _extractMediaUrl( req.url.substring( '/get/'.length ) ),
+        auth: user.getCredentials( req )
+    } );
 
-    request( mediaUrl )
-        .on( 'data', function( chunk ) {
-            res.write( chunk );
-        } )
-        .on( 'error', function( error ) {
-            debug( 'error retrieving media from OpenRosa server: ' + JSON.stringify( error ) );
-            if ( !error.status ) {
-                error.status = ( error.code && error.code == 'ENOTFOUND' ) ? 404 : 500;
-            }
-            next( error );
-        } )
-        .on( 'end', function() {
-            res.end();
-        } );
+    // due to a bug in request/request using options.method with Digest Auth we won't pass method as an option
+    delete options.method;
 
-    // this simpler alternative does not work properly: request( mediaUrl, next ).pipe( res );
+    request.get( options ).pipe( res ).on( 'error', function( error ) {
+        debug( 'error retrieving media from OpenRosa server: ' + JSON.stringify( error ) );
+        if ( !error.status ) {
+            error.status = ( error.code && error.code == 'ENOTFOUND' ) ? 404 : 500;
+        }
+        next( error );
+    } );
+
+    // this simpler alternative does not work properly: req.get( options, next ).pipe( res );
 }

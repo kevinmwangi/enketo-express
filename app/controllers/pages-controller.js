@@ -1,8 +1,8 @@
-"use strict";
+'use strict';
 
-var express = require( 'express' ),
-    router = express.Router(),
-    debug = require( 'debug' )( 'pages-controller' );
+var express = require( 'express' );
+var router = express.Router();
+var debug = require( 'debug' )( 'pages-controller' );
 
 module.exports = function( app ) {
     app.use( '/', router );
@@ -11,10 +11,17 @@ module.exports = function( app ) {
 router
     .get( '/', function( req, res ) {
         res.render( 'index', {
-            title: req.app.get( 'app name' ) || 'Enketo Smart Paper',
-            openrosa: req.app.get( 'linked form and data server' ).name || '?'
+            openrosa: req.app.get( 'linked form and data server' ).name || '?',
+            languages: req.app.get( 'languages supported' )
         } );
     } )
     .get( '/modern-browsers', function( req, res ) {
-        res.render( 'pages/modern-browsers', {} );
+        res.render( 'pages/modern-browsers', {
+            title: "Modern Browsers"
+        } );
+    } )
+    .get( '/offline', function( req, res ) {
+        res.render( 'pages/offline', {
+            title: "Offline"
+        } );
     } );

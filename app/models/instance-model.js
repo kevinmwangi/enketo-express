@@ -1,11 +1,13 @@
-"use strict";
+'use strict';
 
-var Q = require( 'q' ),
-    config = require( '../../config/config' ),
-    client = require( 'redis' ).createClient( config.redis.main.port, config.redis.main.host, {
-        auth_pass: config.redis.main.password
-    } ),
-    debug = require( 'debug' )( 'instance-model' );
+var Q = require( 'q' );
+var config = require( './config-model' ).server;
+var TError = require( '../lib/custom-error' ).TranslatedError;
+var utils = require( '../lib/utils' );
+var client = require( 'redis' ).createClient( config.redis.main.port, config.redis.main.host, {
+    auth_pass: config.redis.main.password
+} );
+var debug = require( 'debug' )( 'instance-model' );
 
 // in test environment, switch to different db
 if ( process.env.NODE_ENV === 'test' ) {
@@ -13,15 +15,16 @@ if ( process.env.NODE_ENV === 'test' ) {
 }
 
 function _cacheInstance( survey ) {
-    var error, key,
+    var error, instanceKey, openRosaKey,
         deferred = Q.defer();
 
-    if ( !survey || !survey.openRosaId || !survey.instanceId || !survey.returnUrl || !survey.instance ) {
+    if ( !survey || !survey.openRosaId || !survey.openRosaServer || !survey.instanceId || !survey.returnUrl || !survey.instance ) {
         error = new Error( 'Bad request. Survey information not complete or invalid' );
         error.status = 400;
         deferred.reject( error );
     } else {
-        key = 'in:' + survey.instanceId;
+        instanceKey = 'in:' + survey.instanceId;
+        openRosaKey = utils.getOpenRosaKey( survey );
         // first check if record exists (i.e. if it is being edited)
         client.hgetall( 'in:' + survey.instanceId, function( err, obj ) {
             if ( err ) {
@@ -31,15 +34,16 @@ function _cacheInstance( survey ) {
                 error.status = 405;
                 deferred.reject( error );
             } else {
-                client.hmset( key, {
+                client.hmset( instanceKey, {
                     returnUrl: survey.returnUrl,
-                    instance: survey.instance
+                    instance: survey.instance,
+                    openRosaKey: openRosaKey
                 }, function( error, id ) {
                     if ( error ) {
                         deferred.reject( error );
                     } else {
                         // expire, no need to wait for result
-                        client.expire( key, 30 );
+                        client.expire( instanceKey, 30 );
                         deferred.resolve( survey );
                     }
                 } );
@@ -62,12 +66,13 @@ function _getInstance( survey ) {
             if ( err ) {
                 deferred.reject( err );
             } else if ( !obj ) {
-                error = new Error( 'Record not present. Page may have expired.' );
+                error = new TError( 'error.instancenotfound' );
                 error.status = 404;
                 deferred.reject( error );
             } else {
                 survey.instance = obj.instance;
                 survey.returnUrl = obj.returnUrl;
+                survey.openRosaKey = obj.openRosaKey;
                 deferred.resolve( survey );
             }
         } );
